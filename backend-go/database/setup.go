@@ -4,18 +4,34 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/lib/pq"
 )
 
 // CriarBancoCompleto cria todo o banco de dados com estrutura e dados das falhas EDP
 func CriarBancoCompleto() error {
-	// Configuração do PostgreSQL
-	host := "localhost"
-	port := "5432"
-	user := "danilo"
-	password := "Danilo@34333528"
-	dbname := "falhas_edp"
+	// Configuração do PostgreSQL a partir de variáveis de ambiente
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "5432"
+	}
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "postgres"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		log.Fatal("❌ DB_PASSWORD não configurado no .env")
+	}
+	dbname := os.Getenv("DB_NAME")
+	if dbname == "" {
+		dbname = "falhas_edp"
+	}
 
 	fmt.Println("🚀 CRIANDO BANCO DE DADOS EDP - SISTEMA DE FALHAS")
 	fmt.Println("================================================")

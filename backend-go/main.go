@@ -35,7 +35,28 @@ func main() {
 
 	// Conectar ao banco de dados
 	fmt.Println("🔗 Conectando ao banco de dados...")
-	connStr := fmt.Sprintf("host=localhost port=5432 user=danilo password=Danilo@34333528 dbname=falhas_edp sslmode=disable")
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		log.Fatal("❌ DB_PASSWORD não configurado no .env")
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "falhas_edp"
+	}
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPassword, dbName)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("❌ Erro ao conectar ao banco: %v", err)

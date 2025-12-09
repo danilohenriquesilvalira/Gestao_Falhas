@@ -1,0 +1,30 @@
+# Node modules (Frontend)
+node_modules/
+front-end/node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Environment variables (IMPORTANTE: NÃO VERSIONAR SENHAS)
+.env
+backend-go/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+*.exe
+*.test
+*.out
