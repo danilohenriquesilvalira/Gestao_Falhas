@@ -1,0 +1,40 @@
+/**
+ * Declarações de tipo para imports não-TypeScript
+ */
+
+// CSS e Estilos
+declare module '*.css';
+declare module '*.scss';
+declare module '*.sass';
+declare module '*.less';
+
+// Imagens
+declare module '*.svg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.png' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.jpg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.jpeg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.gif' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.webp' {
+  const content: string;
+  export default content;
+}

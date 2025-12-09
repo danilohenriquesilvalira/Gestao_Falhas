@@ -1,0 +1,5 @@
+.env
+*.log
+logs/
+*.exe
+backend-go
