@@ -62,7 +62,7 @@ func main() {
 		log.Fatalf("❌ Erro ao conectar ao banco: %v", err)
 	}
 	defer db.Close()
-	
+
 	// Testar conexão
 	if err = db.Ping(); err != nil {
 		log.Fatalf("❌ Erro ao testar conexão com banco: %v", err)

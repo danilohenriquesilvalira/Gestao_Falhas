@@ -1,28 +1,28 @@
-/**
- * Componente: TabelaFalhas
- * 
- * Tabela moderna e elegante para exibir falhas
- * Design minimalista com linhas delicadas
- */
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, RefreshCw, AlertTriangle, ChevronDown, X } from 'lucide-react';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, ChevronDown, X, RefreshCw } from 'lucide-react';
-import { apiService, type OcorrenciaCompleta } from '../../servicos/apiService';
-import type { SetorEclusa } from '../../tipos/falhas';
 
-interface ItemTabela {
-  id: string;
-  setor: string;
-  descricao: string;
-  tipo: 'FALHA' | 'EVENTO';
-  status: 'ATIVO' | 'RESOLVIDO' | 'EM_ANALISE';
-  timestamp: Date;
-  prioridade: 'ALTA' | 'MEDIA' | 'BAIXA';
+interface OcorrenciaAPI {
+  id: number;
+  status: string;
+  timestamp_inicio: string;
+  timestamp_fim?: string;
+  definicao_id: number;
   codigo: string;
-  wordIndex: number;
-  bitIndex: number;
-  duracaoSegundos?: number;
+  tipo: string;
+  descricao: string;
+  prioridade: string;
+  word_index: number;
+  bit_index: number;
+  classe_mensagem: string;
+  setor_codigo: string;
+  setor_nome: string;
+  eclusa_codigo: string;
+  eclusa_nome: string;
+  duracao_segundos?: number;
 }
+
+const API_URL = 'http://127.0.0.1:8080/api/v1/ocorrencias/historico';
 
 const SETORES = [
   { value: 'TODOS', label: 'Todos os setores' },
@@ -36,8 +36,8 @@ const SETORES = [
 
 const TIPOS = [
   { value: 'TODOS', label: 'Todos os tipos' },
-  { value: 'FALHAS', label: 'Falhas' },
-  { value: 'EVENTOS', label: 'Eventos' }
+  { value: 'FALHA', label: 'Falhas' },
+  { value: 'EVENTO', label: 'Eventos' }
 ];
 
 const STATUS = [
@@ -47,303 +47,231 @@ const STATUS = [
   { value: 'EM_ANALISE', label: 'Em Análise' }
 ];
 
-// Função para converter ocorrências da API para formato da tabela
-const converterOcorrenciaParaItem = (ocorrencia: OcorrenciaCompleta): ItemTabela => {
-  return {
-    id: `ocorrencia-${ocorrencia.id}`,
-    setor: ocorrencia.setor_codigo,
-    descricao: ocorrencia.descricao,
-    tipo: ocorrencia.tipo,
-    status: ocorrencia.status,
-    timestamp: new Date(ocorrencia.timestamp_inicio),
-    prioridade: ocorrencia.prioridade,
-    codigo: ocorrencia.codigo,
-    wordIndex: ocorrencia.word_index,
-    bitIndex: ocorrencia.bit_index,
-    duracaoSegundos: ocorrencia.duracao_segundos
-  };
-};
-
-const formatarNomeSetor = (setorCodigo: string): string => {
-  const nomes: Record<string, string> = {
-    'ENCHIMENTO': 'Enchimento',
-    'ESVAZIAMENTO': 'Esvaziamento',
-    'PORTAJUSANTE': 'Porta Jusante',
-    'PORTAMONTANTE': 'Porta Montante',
-    'COMANDO_ECLUSA': 'Comando Eclusa',
-    'ESGOTO_DRENAGEM': 'Esgoto Drenagem'
-  };
-  return nomes[setorCodigo] || setorCodigo;
-};
-
-// Função para criar badge de status com tamanho fixo
-const criarBadgeStatus = (status: string) => {
-  const configs = {
-    'ATIVO': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', label: 'Ativo' },
-    'RESOLVIDO': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200', label: 'Resolvido' },
-    'EM_ANALISE': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', label: 'Em Análise' }
-  };
-  
-  const config = configs[status as keyof typeof configs] || configs.ATIVO;
-  
-  return (
-    <span className={`inline-flex items-center justify-center w-20 px-2 py-1 rounded-md text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}>
-      {config.label}
-    </span>
-  );
-};
-
-// Função para criar badge de prioridade neutro
-const criarBadgePrioridade = (prioridade: string) => {
-  const configs = {
-    'ALTA': { label: 'Alta', weight: 'font-bold' },
-    'MEDIA': { label: 'Média', weight: 'font-medium' },
-    'BAIXA': { label: 'Baixa', weight: 'font-normal' }
-  };
-  
-  const config = configs[prioridade as keyof typeof configs] || configs.MEDIA;
-  
-  return (
-    <span className={`inline-flex items-center justify-center w-16 px-2 py-1 rounded-md text-xs ${config.weight} border bg-gray-50 text-gray-700 border-gray-200`}>
-      {config.label}
-    </span>
-  );
-};
-
-// Função para badge de tipo neutro
-const criarBadgeTipo = (tipo: string) => {
-  const configs = {
-    'FALHA': { label: 'Falha' },
-    'EVENTO': { label: 'Evento' }
-  };
-  
-  const config = configs[tipo as keyof typeof configs] || configs.EVENTO;
-  
-  return (
-    <span className="inline-flex items-center justify-center w-16 px-2 py-1 rounded-md text-xs font-medium border bg-gray-100 text-gray-600 border-gray-200">
-      {config.label}
-    </span>
-  );
-};
-
-// Componente de linha otimizado para performance
-const LinhaTabela: React.FC<{item: ItemTabela; calcularTempoRelativo: (timestamp: Date) => string}> = React.memo(({item, calcularTempoRelativo}) => {
-  return (
-    <tr 
-      key={item.id}
-      className="hover:bg-gray-50/80 transition-all duration-300 border-l-4 border-transparent hover:shadow-sm cursor-pointer group will-change-transform"
-      style={{
-        borderLeftColor: 'transparent'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderLeftColor = '#212E3E'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderLeftColor = 'transparent'
-      }}
-    >
-      {/* Setor */}
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-edp-marine group-hover:text-edp-marine transition-colors">
-          {formatarNomeSetor(item.setor)}
-        </div>
-        <div className="text-xs text-edp-slate group-hover:text-edp-marine transition-colors">
-          {item.setor}
-        </div>
-      </td>
-
-      {/* Descrição */}
-      <td className="px-6 py-4">
-        <div className="text-sm text-edp-slate leading-tight max-w-md group-hover:text-gray-700 transition-colors">
-          {item.descricao}
-        </div>
-      </td>
-
-      {/* Tipo */}
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        {criarBadgeTipo(item.tipo)}
-      </td>
-
-      {/* Status */}
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        {criarBadgeStatus(item.status)}
-      </td>
-
-      {/* Prioridade */}
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        {criarBadgePrioridade(item.prioridade)}
-      </td>
-
-      {/* Data/Hora */}
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        <div className="text-sm text-edp-slate font-medium">
-          {item.timestamp.toLocaleDateString('pt-PT', {
-            day: '2-digit',
-            month: '2-digit',
-            year: '2-digit'
-          })} às {item.timestamp.toLocaleTimeString('pt-PT', {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
-        </div>
-      </td>
-    </tr>
-  );
-});
-
-LinhaTabela.displayName = 'LinhaTabela';
-
-// Skeleton loading para melhor UX
-const SkeletonLoader: React.FC = () => (
-  <>
-    {Array.from({ length: 5 }, (_, index) => (
-      <tr key={`skeleton-${index}`} className="border-b border-gray-200">
-        <td className="px-6 py-4">
-          <div className="animate-pulse space-y-2">
-            <div className="h-4 bg-gray-200 rounded w-24"></div>
-            <div className="h-3 bg-gray-200 rounded w-16"></div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-48"></div>
-          </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded-md w-16 mx-auto"></div>
-          </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded-md w-20 mx-auto"></div>
-          </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded-md w-16 mx-auto"></div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="animate-pulse space-y-2">
-            <div className="h-4 bg-gray-200 rounded w-20"></div>
-            <div className="h-3 bg-gray-200 rounded w-16"></div>
-          </div>
-        </td>
-      </tr>
-    ))}
-  </>
-);
-
 export const TabelaFalhas: React.FC = () => {
-  const [paginaAtual, setPaginaAtual] = useState(1);
-  const [busca, setBusca] = useState('');
-  const [carregando, setCarregando] = useState(true);
-  const [recarregando, setRecarregando] = useState(false);
-  const [dados, setDados] = useState<ItemTabela[]>([]);
-  const [erro, setErro] = useState<string | null>(null);
-  const [filtros, setFiltros] = useState({
-    setor: 'TODOS' as string,
-    tipo: 'TODOS' as 'TODOS' | 'FALHAS' | 'EVENTOS',
-    status: 'TODOS' as 'TODOS' | 'ATIVO' | 'RESOLVIDO' | 'EM_ANALISE'
-  });
-  
-  const itensPorPagina = 10;
-
-  // Carregar dados da API
-  const carregarDados = async (mostrarLoader = true) => {
+  const [dados, setDados] = useState<OcorrenciaAPI[]>(() => {
     try {
-      if (mostrarLoader) {
-        setCarregando(true);
-      } else {
-        setRecarregando(true);
-      }
-      setErro(null);
+      const saved = localStorage.getItem('tabelaFalhas_dados');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [carregando, setCarregando] = useState(false);
+  const [recarregando, setRecarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
+  const [filtros, setFiltros] = useState({
+    setor: 'TODOS',
+    tipo: 'TODOS',
+    status: 'TODOS'
+  });
 
-      // Carregar histórico de ocorrências com filtros
-      const ocorrencias = await apiService.obterHistoricoOcorrencias({
-        setor: filtros.setor !== 'TODOS' ? filtros.setor : undefined,
-        tipo: filtros.tipo !== 'TODOS' ? filtros.tipo : undefined,
-        status: filtros.status !== 'TODOS' ? filtros.status : undefined,
-        limite: 1000 // Buscar mais dados para filtros locais funcionarem
-      });
-
-      const itensTabela = ocorrencias.map(converterOcorrenciaParaItem);
-      setDados(itensTabela);
+  const carregarDados = async (mostrarLoader = false) => {
+    if (mostrarLoader) {
+      setCarregando(true);
+    } else {
+      setRecarregando(true);
+    }
+    setErro(null);
+    
+    try {
+      const response = await fetch(API_URL);
       
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setErro('Erro ao carregar dados. Verifique se o servidor está rodando.');
-      setDados([]);
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const novosDados = data.success && Array.isArray(data.data) ? data.data : [];
+      setDados(novosDados);
+      
+      // Salvar no localStorage
+      if (novosDados.length > 0) {
+        localStorage.setItem('tabelaFalhas_dados', JSON.stringify(novosDados));
+      }
+      
+    } catch (error: any) {
+      setErro(error.message);
+      if (mostrarLoader) {
+        setDados([]); // Só limpa dados no carregamento inicial
+      }
     } finally {
       setCarregando(false);
       setRecarregando(false);
     }
   };
 
-  // Carregar dados iniciais
   useEffect(() => {
-    carregarDados();
+    // Se não tem dados salvos, carrega silenciosamente
+    const temDados = localStorage.getItem('tabelaFalhas_dados');
+    if (!temDados) {
+      carregarDados(false); // Carrega sem mostrar skeleton
+    }
   }, []);
 
-  // Recarregar quando filtros mudarem (exceto busca local)
-  useEffect(() => {
-    carregarDados();
-  }, [filtros]);
-  
-  // Aplicar filtros locais (busca)
   const dadosFiltrados = useMemo(() => {
+    const buscaLower = busca.toLowerCase();
+    
     return dados.filter(item => {
-      // Filtro por busca local
       if (busca && 
-          !item.descricao.toLowerCase().includes(busca.toLowerCase()) && 
-          !formatarNomeSetor(item.setor).toLowerCase().includes(busca.toLowerCase()) &&
-          !item.codigo.toLowerCase().includes(busca.toLowerCase())) {
+          !item.descricao.toLowerCase().includes(buscaLower) && 
+          !formatarNomeSetor(item.setor_codigo).toLowerCase().includes(buscaLower) &&
+          !item.codigo.toLowerCase().includes(buscaLower)) {
         return false;
       }
-      
-      return true;
+
+      return (filtros.setor === 'TODOS' || item.setor_codigo === filtros.setor) &&
+             (filtros.tipo === 'TODOS' || item.tipo === filtros.tipo) &&
+             (filtros.status === 'TODOS' || item.status === filtros.status);
     });
-  }, [dados, busca]);
+  }, [dados, busca, filtros]);
 
-  // Paginação
-  const totalPaginas = Math.ceil(dadosFiltrados.length / itensPorPagina);
-  const indiceInicial = (paginaAtual - 1) * itensPorPagina;
-  const dadosPaginados = dadosFiltrados.slice(indiceInicial, indiceInicial + itensPorPagina);
-
-  // Reset página quando filtros mudam com loading
-  React.useEffect(() => {
-    setCarregando(true);
-    setPaginaAtual(1);
-    // Simula loading para melhor UX
-    const timer = setTimeout(() => setCarregando(false), 300);
-    return () => clearTimeout(timer);
-  }, [filtros, busca]);
-
-  // Indicador de tempo real - atualiza a cada minuto
-  const [tempoAtual, setTempoAtual] = useState(new Date());
-  React.useEffect(() => {
-    const interval = setInterval(() => setTempoAtual(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Função para calcular tempo relativo
-  const calcularTempoRelativo = (timestamp: Date): string => {
-    const agora = tempoAtual.getTime();
-    const diferenca = agora - timestamp.getTime();
-    const minutos = Math.floor(diferenca / (1000 * 60));
-    
-    if (minutos < 1) return 'agora';
-    if (minutos < 60) return `há ${minutos}min`;
-    const horas = Math.floor(minutos / 60);
-    if (horas < 24) return `há ${horas}h`;
-    const dias = Math.floor(horas / 24);
-    return `há ${dias}d`;
+  const formatarData = (timestamp: string) => {
+    const data = new Date(timestamp);
+    return `${data.toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit'
+    })} às ${data.toLocaleTimeString('pt-PT', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
   };
 
+  const formatarNomeSetor = (setorCodigo: string): string => {
+    const nomes: Record<string, string> = {
+      'ENCHIMENTO': 'Enchimento',
+      'ESVAZIAMENTO': 'Esvaziamento',
+      'PORTAJUSANTE': 'Porta Jusante',
+      'PORTAMONTANTE': 'Porta Montante',
+      'COMANDO_ECLUSA': 'Comando Eclusa',
+      'ESGOTO_DRENAGEM': 'Esgoto Drenagem'
+    };
+    return nomes[setorCodigo] || setorCodigo;
+  };
+
+  const Badge: React.FC<{ tipo: 'status' | 'tipo' | 'prioridade', valor: string }> = ({ tipo, valor }) => {
+    if (tipo === 'status') {
+      const configs = {
+        'ATIVO': 'bg-red-100 text-red-800 border-red-200',
+        'RESOLVIDO': 'bg-green-100 text-green-800 border-green-200',
+        'EM_ANALISE': 'bg-amber-100 text-amber-800 border-amber-200'
+      };
+      const labels = { 'ATIVO': 'Ativo', 'RESOLVIDO': 'Resolvido', 'EM_ANALISE': 'Em Análise' };
+      const config = configs[valor as keyof typeof configs] || configs.ATIVO;
+      
+      return (
+        <span className={`inline-flex items-center justify-center w-20 px-2 py-1 rounded-md text-xs font-medium border ${config}`}>
+          {labels[valor as keyof typeof labels] || valor}
+        </span>
+      );
+    }
+
+    if (tipo === 'tipo') {
+      const labels = { 'FALHA': 'Falha', 'EVENTO': 'Evento' };
+      return (
+        <span className="inline-flex items-center justify-center w-16 px-2 py-1 rounded-md text-xs font-medium border bg-gray-100 text-gray-600 border-gray-200">
+          {labels[valor as keyof typeof labels] || valor}
+        </span>
+      );
+    }
+
+    const configs = {
+      'ALTA': 'font-bold',
+      'MEDIA': 'font-medium', 
+      'BAIXA': 'font-normal'
+    };
+    const labels = { 'ALTA': 'Alta', 'MEDIA': 'Média', 'BAIXA': 'Baixa' };
+    const weight = configs[valor as keyof typeof configs] || configs.MEDIA;
+    
+    return (
+      <span className={`inline-flex items-center justify-center w-16 px-2 py-1 rounded-md text-xs ${weight} border bg-gray-50 text-gray-700 border-gray-200`}>
+        {labels[valor as keyof typeof labels] || valor}
+      </span>
+    );
+  };
+
+  // Skeleton Loading mais elegante
+  if (carregando) {
+    return (
+      <div className="w-full max-w-none bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        {/* Header do skeleton */}
+        <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
+          <div className="animate-pulse">
+            <div className="h-10 bg-gray-200 rounded-xl mb-4"></div>
+            <div className="flex gap-4">
+              <div className="h-8 bg-gray-200 rounded-lg flex-1 max-w-[180px]"></div>
+              <div className="h-8 bg-gray-200 rounded-lg flex-1 max-w-[150px]"></div>
+              <div className="h-8 bg-gray-200 rounded-lg flex-1 max-w-[150px]"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Skeleton da tabela */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {Array.from({ length: 5 }, (_, index) => (
+                <tr key={`skeleton-${index}`} className="animate-pulse">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 bg-gray-200 rounded w-48 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-32"></div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="h-6 bg-gray-200 rounded w-16 mx-auto"></div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="h-6 bg-gray-200 rounded w-20 mx-auto"></div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="h-6 bg-gray-200 rounded w-16 mx-auto"></div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="h-4 bg-gray-200 rounded w-20 mx-auto"></div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (erro) {
+    return (
+      <div className="w-full bg-white rounded-xl border border-gray-200 shadow-sm p-8">
+        <div className="text-center text-red-600">
+          <AlertTriangle size={48} className="mx-auto mb-4" />
+          <p className="font-medium mb-2">Erro ao carregar dados</p>
+          <p className="text-sm mb-4">{erro}</p>
+          <button 
+            onClick={() => carregarDados()}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-none bg-white rounded-xl border border-edp-marine/20 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-      {/* Filtros e busca */}
+    <div className="w-full max-w-none bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
       <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
         {/* Busca */}
         <div className="mb-4 lg:mb-6">
@@ -356,7 +284,7 @@ export const TabelaFalhas: React.FC = () => {
               placeholder="Buscar por descrição, setor ou palavra-chave..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 sm:py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white hover:bg-white"
+              className="w-full pl-10 pr-10 py-2 sm:py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white hover:bg-white"
             />
             {busca && (
               <button
@@ -375,11 +303,10 @@ export const TabelaFalhas: React.FC = () => {
           <div className="relative flex-1 sm:flex-none sm:min-w-[180px]">
             <select
               value={filtros.setor}
-              onChange={(e) => setFiltros({...filtros, setor: e.target.value as any})}
-              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer transition-all duration-200"
+              onChange={(e) => setFiltros({...filtros, setor: e.target.value})}
+              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
             >
-              <option value="TODOS">Todos os setores</option>
-              {SETORES.slice(1).map(setor => (
+              {SETORES.map(setor => (
                 <option key={setor.value} value={setor.value}>
                   {setor.label}
                 </option>
@@ -394,8 +321,8 @@ export const TabelaFalhas: React.FC = () => {
           <div className="relative flex-1 sm:flex-none sm:min-w-[150px]">
             <select
               value={filtros.tipo}
-              onChange={(e) => setFiltros({...filtros, tipo: e.target.value as any})}
-              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer transition-all duration-200"
+              onChange={(e) => setFiltros({...filtros, tipo: e.target.value})}
+              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
             >
               {TIPOS.map(tipo => (
                 <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
@@ -410,8 +337,8 @@ export const TabelaFalhas: React.FC = () => {
           <div className="relative flex-1 sm:flex-none sm:min-w-[150px]">
             <select
               value={filtros.status}
-              onChange={(e) => setFiltros({...filtros, status: e.target.value as any})}
-              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer transition-all duration-200"
+              onChange={(e) => setFiltros({...filtros, status: e.target.value})}
+              className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
             >
               {STATUS.map(status => (
                 <option key={status.value} value={status.value}>
@@ -424,11 +351,21 @@ export const TabelaFalhas: React.FC = () => {
             </div>
           </div>
 
-          {/* Contador e Limpar */}
+          {/* Contador, Atualizar e Limpar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 sm:ml-auto mt-2 sm:mt-0">
             <div className="text-sm text-gray-500">
               {dadosFiltrados.length} registros
             </div>
+
+            {/* Botão Atualizar */}
+            <button
+              onClick={() => carregarDados(false)}
+              disabled={recarregando}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={14} className={recarregando ? 'animate-spin' : ''} />
+              {recarregando ? 'Atualizando...' : 'Atualizar'}
+            </button>
             
             {/* Limpar filtros */}
             {(filtros.setor !== 'TODOS' || filtros.tipo !== 'TODOS' || filtros.status !== 'TODOS' || busca) && (
@@ -446,226 +383,72 @@ export const TabelaFalhas: React.FC = () => {
         </div>
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto max-w-full">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Setor
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Descrição
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Tipo
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Prioridade
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-edp-slate uppercase tracking-wider">
-                Data/Hora
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {carregando ? (
-              <SkeletonLoader />
-            ) : (
-              dadosPaginados.map((item) => (
-                <LinhaTabela key={item.id} item={item} calcularTempoRelativo={calcularTempoRelativo} />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile View - Melhorado */}
-      <div className="md:hidden space-y-3 p-3 sm:p-4">
-        {dadosPaginados.map((item) => (
-          <div 
-            key={`mobile-${item.id}`} 
-            className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition-all duration-300 hover:border-edp-marine/30"
-          >
-            {/* Linha 1: Setor + Status */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-edp-marine">
-                {formatarNomeSetor(item.setor)}
-              </span>
-              {criarBadgeStatus(item.status)}
-            </div>
-            
-            {/* Linha 2: Descrição */}
-            <div className="text-sm text-edp-slate mb-3 leading-relaxed">
-              {item.descricao}
-            </div>
-            
-            {/* Linha 3: Badges */}
-            <div className="flex items-center gap-2 mb-3">
-              {criarBadgeTipo(item.tipo)}
-              {criarBadgePrioridade(item.prioridade)}
-            </div>
-            
-            {/* Linha 4: Data */}
-            <div className="text-xs text-edp-slate/60 flex items-center justify-end">
-              <span>
-                {item.timestamp.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })} às {item.timestamp.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-
-      {/* Rodapé com paginação ou info */}
-      <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="text-xs md:text-sm text-edp-slate">
-            {dadosFiltrados.length} registros
-          </div>
-          
-          {totalPaginas > 1 && (
-            <div className="flex items-center gap-1">
-              {/* Botão Anterior */}
-              <button
-                onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
-                disabled={paginaAtual === 1}
-                className={`
-                  flex items-center px-2 py-1 text-xs md:text-sm rounded-md transition-all duration-200
-                  ${paginaAtual === 1 
-                    ? 'text-gray-400 cursor-not-allowed' 
-                    : 'text-edp-slate hover:bg-gray-100 hover:text-edp-marine'
-                  }
-                `}
-              >
-                <ChevronLeft size={14} />
-              </button>
-
-              {/* Mobile: Apenas 3 números */}
-              <div className="md:hidden flex items-center gap-1">
-                {Array.from({ length: Math.min(3, totalPaginas) }, (_, i) => {
-                  let pageNumber;
-                  if (totalPaginas <= 3) {
-                    pageNumber = i + 1;
-                  } else if (paginaAtual === 1) {
-                    pageNumber = i + 1;
-                  } else if (paginaAtual === totalPaginas) {
-                    pageNumber = totalPaginas - 2 + i;
-                  } else {
-                    pageNumber = paginaAtual - 1 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => setPaginaAtual(pageNumber)}
-                      className={`
-                        w-6 h-6 text-xs font-medium rounded transition-all duration-200
-                        ${pageNumber === paginaAtual
-                          ? 'bg-edp-marine text-white'
-                          : 'text-edp-slate hover:bg-gray-100'
-                        }
-                      `}
-                    >
-                      {pageNumber}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Desktop: 5 números */}
-              <div className="hidden md:flex items-center gap-1">
-                {/* Primeira página se necessário */}
-                {paginaAtual > 3 && totalPaginas > 5 && (
-                  <>
-                    <button
-                      onClick={() => setPaginaAtual(1)}
-                      className="w-8 h-8 text-sm font-medium rounded-md transition-all duration-200 text-edp-slate hover:bg-gray-100 hover:text-edp-marine"
-                    >
-                      1
-                    </button>
-                    <span className="px-1 text-edp-slate">...</span>
-                  </>
-                )}
-
-                {/* Números das páginas */}
-                {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
-                  let pageNumber;
-                  if (totalPaginas <= 5) {
-                    pageNumber = i + 1;
-                  } else if (paginaAtual <= 3) {
-                    pageNumber = i + 1;
-                  } else if (paginaAtual >= totalPaginas - 2) {
-                    pageNumber = totalPaginas - 4 + i;
-                  } else {
-                    pageNumber = paginaAtual - 2 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => setPaginaAtual(pageNumber)}
-                      className={`
-                        w-8 h-8 text-sm font-medium rounded-md transition-all duration-200
-                        ${pageNumber === paginaAtual
-                          ? 'bg-edp-marine text-white shadow-sm'
-                          : 'text-edp-slate hover:bg-gray-100 hover:text-edp-marine'
-                        }
-                      `}
-                    >
-                      {pageNumber}
-                    </button>
-                  );
-                })}
-
-                {/* Última página se necessário */}
-                {paginaAtual < totalPaginas - 2 && totalPaginas > 5 && (
-                  <>
-                    <span className="px-1 text-edp-slate">...</span>
-                    <button
-                      onClick={() => setPaginaAtual(totalPaginas)}
-                      className="w-8 h-8 text-sm font-medium rounded-md transition-all duration-200 text-edp-slate hover:bg-gray-100 hover:text-edp-marine"
-                    >
-                      {totalPaginas}
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Botão Próximo */}
-              <button
-                onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
-                disabled={paginaAtual === totalPaginas}
-                className={`
-                  flex items-center px-2 py-1 text-xs md:text-sm rounded-md transition-all duration-200
-                  ${paginaAtual === totalPaginas 
-                    ? 'text-gray-400 cursor-not-allowed' 
-                    : 'text-edp-slate hover:bg-gray-100 hover:text-edp-marine'
-                  }
-                `}
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Estado vazio */}
-      {dadosFiltrados.length === 0 && (
+      {dadosFiltrados.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-edp-slate/60 mb-2">
-            <Search size={48} className="mx-auto mb-3 opacity-50" />
-          </div>
-          <p className="text-edp-slate font-medium mb-1">
-            Nenhum registro encontrado
+          <Search size={48} className="mx-auto mb-4 text-gray-400 opacity-50" />
+          <p className="text-gray-600 font-medium mb-1">
+            {dados.length === 0 ? 'Nenhuma ocorrência registrada' : 'Nenhum registro encontrado'}
           </p>
-          <p className="text-sm text-edp-slate/60">
-            Tente ajustar os filtros de busca
+          <p className="text-sm text-gray-500">
+            {dados.length === 0 
+              ? 'As ocorrências aparecerão aqui quando forem registradas pelo PLC'
+              : 'Tente ajustar os filtros de busca'
+            }
           </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto max-w-full">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {dadosFiltrados.map((item) => (
+                <tr 
+                  key={item.id} 
+                  className="hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-transparent transition-all duration-200 border-l-2 border-transparent hover:border-blue-400 hover:shadow-sm"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatarNomeSetor(item.setor_codigo)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {item.setor_codigo}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 leading-tight max-w-md">
+                      {item.descricao}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.codigo}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <Badge tipo="tipo" valor={item.tipo} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <Badge tipo="status" valor={item.status} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <Badge tipo="prioridade" valor={item.prioridade} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="text-sm text-gray-600 font-medium">
+                      {formatarData(item.timestamp_inicio)}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

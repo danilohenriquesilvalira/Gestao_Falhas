@@ -60,10 +60,10 @@ func NovoServidorHTTP(db *sql.DB) *ServidorHTTP {
 
 // configurarRotas configura todas as rotas da API
 func (s *ServidorHTTP) configurarRotas() {
-	api := s.router.PathPrefix("/api/v1").Subrouter()
+	// Aplicar CORS em TODAS as rotas
+	s.router.Use(s.middlewareCORS)
 	
-	// Middleware CORS
-	api.Use(s.middlewareCORS)
+	api := s.router.PathPrefix("/api/v1").Subrouter()
 	
 	// Rotas de ocorrências
 	api.HandleFunc("/ocorrencias/ativas", s.obterOcorrenciasAtivas).Methods("GET")
@@ -86,10 +86,14 @@ func (s *ServidorHTTP) configurarRotas() {
 // middlewareCORS adiciona headers CORS
 func (s *ServidorHTTP) middlewareCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Permitir todas as origens para desenvolvimento
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Expose-Headers", "*")
+		w.Header().Set("Access-Control-Max-Age", "86400")
 		
+		// Responder às requisições OPTIONS (preflight)
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -101,6 +105,16 @@ func (s *ServidorHTTP) middlewareCORS(next http.Handler) http.Handler {
 
 // obterOcorrenciasAtivas retorna todas as ocorrências ativas com informações completas
 func (s *ServidorHTTP) obterOcorrenciasAtivas(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	
 	query := `
 		SELECT 
 			o.id, o.status, o.timestamp_inicio, o.timestamp_fim,
@@ -157,6 +171,16 @@ func (s *ServidorHTTP) obterOcorrenciasAtivas(w http.ResponseWriter, r *http.Req
 
 // obterHistoricoOcorrencias retorna histórico com filtros
 func (s *ServidorHTTP) obterHistoricoOcorrencias(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	
 	// Parâmetros de filtro
 	limite := r.URL.Query().Get("limite")
 	if limite == "" {
@@ -267,6 +291,16 @@ func (s *ServidorHTTP) obterHistoricoOcorrencias(w http.ResponseWriter, r *http.
 
 // verificarSaude verifica se a API está funcionando
 func (s *ServidorHTTP) verificarSaude(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "OK",

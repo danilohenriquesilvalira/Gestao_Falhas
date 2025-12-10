@@ -5,7 +5,7 @@
  * Gerencia todas as chamadas para o sistema de falhas
  */
 
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = 'http://127.0.0.1:8080/api/v1';
 
 // Tipos da API (espelhando o que vem do backend)
 export interface OcorrenciaCompleta {
@@ -94,24 +94,22 @@ class ApiService {
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        ...options,
-      });
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...options,
+    });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Erro na requisição da API:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    return await response.json();
   }
 
   // Verificar saúde da API
@@ -144,28 +142,10 @@ class ApiService {
     limite?: number;
   }): Promise<OcorrenciaCompleta[]> {
     try {
-      const params = new URLSearchParams();
-      
-      if (filtros?.setor && filtros.setor !== 'TODOS') {
-        params.append('setor', filtros.setor);
-      }
-      if (filtros?.tipo && filtros.tipo !== 'TODOS') {
-        params.append('tipo', filtros.tipo === 'FALHAS' ? 'FALHA' : 'EVENTO');
-      }
-      if (filtros?.status && filtros.status !== 'TODOS') {
-        params.append('status', filtros.status);
-      }
-      if (filtros?.limite) {
-        params.append('limite', filtros.limite.toString());
-      }
-
-      const queryString = params.toString();
-      const endpoint = `/ocorrencias/historico${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await this.request<OcorrenciaCompleta[]>(endpoint);
-      return response.data;
+      const response = await this.request<OcorrenciaCompleta[]>('/ocorrencias/historico');
+      return response.data || [];
     } catch (error) {
-      console.error('Erro ao buscar histórico de ocorrências:', error);
+      console.error('Erro ao buscar histórico:', error);
       return [];
     }
   }

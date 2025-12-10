@@ -11,17 +11,26 @@ import PaginaFalhasModerna from './paginas/PaginaFalhasModerna';
 import PaginaDashboard from './paginas/PaginaDashboard';
 
 function App() {
-  const [paginaAtiva, setPaginaAtiva] = useState('inicio');
-  const [sidebarRecolhido, setSidebarRecolhido] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
+  const [paginaAtiva, setPaginaAtiva] = useState(() => {
+    return localStorage.getItem('paginaAtiva') || 'inicio';
+  });
+  const [sidebarRecolhido, setSidebarRecolhido] = useState(() => {
+    const saved = localStorage.getItem('sidebarRecolhido');
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  });
 
   const handleItemClick = (id: string) => {
     setPaginaAtiva(id);
+    localStorage.setItem('paginaAtiva', id);
   };
 
   const handleToggleSidebar = () => {
-    setSidebarRecolhido(!sidebarRecolhido);
+    const novoEstado = !sidebarRecolhido;
+    setSidebarRecolhido(novoEstado);
+    localStorage.setItem('sidebarRecolhido', JSON.stringify(novoEstado));
   };
 
   // Mapear páginas para títulos

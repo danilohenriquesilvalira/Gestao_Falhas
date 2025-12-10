@@ -75,6 +75,16 @@ type Eclusa struct {
 
 // obterEstatisticasDashboard retorna estatísticas gerais para o dashboard
 func (s *ServidorHTTP) obterEstatisticasDashboard(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	stats := EstatisticasDashboard{
 		PorSetor:      make(map[string]int),
 		PorPrioridade: make(map[string]int),
@@ -244,6 +254,16 @@ func (s *ServidorHTTP) obterEstatisticasPorSetor(w http.ResponseWriter, r *http.
 
 // obterDefinicoesFalhas retorna todas as definições de falhas
 func (s *ServidorHTTP) obterDefinicoesFalhas(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	// Filtros opcionais
 	setor := r.URL.Query().Get("setor")
 	tipo := r.URL.Query().Get("tipo")
@@ -311,6 +331,16 @@ func (s *ServidorHTTP) obterDefinicoesFalhas(w http.ResponseWriter, r *http.Requ
 
 // obterSetores retorna todos os setores
 func (s *ServidorHTTP) obterSetores(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	rows, err := s.bancoDados.Query("SELECT id, codigo, nome, cor_tema FROM setores ORDER BY nome")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Erro ao buscar setores: %v", err), http.StatusInternalServerError)
@@ -347,6 +377,16 @@ func (s *ServidorHTTP) obterSetores(w http.ResponseWriter, r *http.Request) {
 
 // obterEclusas retorna todas as eclusas
 func (s *ServidorHTTP) obterEclusas(w http.ResponseWriter, r *http.Request) {
+	// CORS direto no handler
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	rows, err := s.bancoDados.Query("SELECT id, codigo, nome, localizacao, ativa FROM eclusas ORDER BY nome")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Erro ao buscar eclusas: %v", err), http.StatusInternalServerError)

@@ -226,7 +226,7 @@ func inserirDadosIniciais(db *sql.DB) error {
 	// Verificar e inserir Eclusas
 	var countEclusas int
 	db.QueryRow("SELECT COUNT(*) FROM eclusas").Scan(&countEclusas)
-	
+
 	if countEclusas > 0 {
 		fmt.Printf("  ✅ Eclusas já existem (%d registros)\n", countEclusas)
 	} else {
@@ -255,7 +255,7 @@ func inserirDadosIniciais(db *sql.DB) error {
 	// Verificar e inserir Setores
 	var countSetores int
 	db.QueryRow("SELECT COUNT(*) FROM setores").Scan(&countSetores)
-	
+
 	if countSetores > 0 {
 		fmt.Printf("  ✅ Setores já existem (%d registros)\n", countSetores)
 	} else {
@@ -290,14 +290,14 @@ func inserirFalhasEventosRegua(db *sql.DB) error {
 	// Verificar se as definições já existem
 	var countDefinicoes int
 	db.QueryRow("SELECT COUNT(*) FROM definicoes_falhas WHERE eclusa_id = (SELECT id FROM eclusas WHERE codigo = 'REGUA')").Scan(&countDefinicoes)
-	
+
 	if countDefinicoes > 0 {
 		fmt.Printf("  ✅ Falhas e eventos da Régua já existem (%d registros)\n", countDefinicoes)
 		return nil
 	}
 
 	fmt.Println("  📋 Inserindo falhas e eventos da Régua...")
-	
+
 	// Buscar ID da eclusa Régua
 	var eclusa_id int
 	err := db.QueryRow("SELECT id FROM eclusas WHERE codigo = 'REGUA'").Scan(&eclusa_id)
@@ -1094,9 +1094,9 @@ func inserirFalhasEventosRegua(db *sql.DB) error {
 		codigo := fmt.Sprintf("RG_%s_%03d", registro.Setor, registro.ID)
 
 		// Calcular WORD e BIT baseado no ID da falha
-		wordIndex := (registro.ID - 1) / 16  // Cada WORD tem 16 bits
-		bitIndex := (registro.ID - 1) % 16   // Posição do bit dentro da WORD
-		
+		wordIndex := (registro.ID - 1) / 16 // Cada WORD tem 16 bits
+		bitIndex := (registro.ID - 1) % 16  // Posição do bit dentro da WORD
+
 		_, err = db.Exec(`
 			INSERT INTO definicoes_falhas 
 			(eclusa_id, setor_id, codigo, tipo, descricao, prioridade, point_index, classe_mensagem, word_index, bit_index)
