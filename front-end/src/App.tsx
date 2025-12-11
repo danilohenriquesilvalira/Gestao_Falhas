@@ -4,7 +4,7 @@
  * Ponto de entrada da aplicação
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Sidebar } from './componentes/layout/Sidebar';
 import { Header } from './componentes/layout/Header';
 import PaginaFalhasModerna from './paginas/PaginaFalhasModerna';
@@ -123,7 +123,6 @@ function App() {
         <Header 
           titulo={getTitulo()} 
           nomeUsuario="João Silva"
-          aoToggleSidebar={handleToggleSidebar}
         />
 
         {/* Conteúdo Principal */}
